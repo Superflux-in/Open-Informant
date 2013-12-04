@@ -117,6 +117,7 @@ const int Pin_RESET = 6;
 const int Pin_BUSY = 7;
 const int Pin_EPD_CS = 8;
 
+
 // pre-processor convert to string
 #define MAKE_STRING1(X) #X
 #define MAKE_STRING(X) MAKE_STRING1(X)
