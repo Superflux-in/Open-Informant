@@ -41,6 +41,9 @@
 // configure images for display size
 // change these to match display size above
 
+#define NUM_IMAGES 3
+#define LOOP_DURATION 12000
+
 #define IMAGE_00_IMAGE "image_00.xbm"
 #define IMAGE_00_BITS image_00_bits
 
@@ -49,16 +52,6 @@
 
 #define IMAGE_02_IMAGE "image_02.xbm"
 #define IMAGE_02_BITS image_02_bits
-
-//#define IMAGE_03_IMAGE "image_03.xbm"
-//#define IMAGE_03_BITS image_03_bits
-//
-//#define IMAGE_04_IMAGE "image_04.xbm"
-//#define IMAGE_04_BITS image_04_bits
-//
-//#define IMAGE_05_IMAGE "image_05.xbm"
-//#define IMAGE_05_BITS image_05_bits
-//
 
 // Add Images library to compiler path
 #include <Images.h>  // this is just an empty file
@@ -85,27 +78,6 @@ PROGMEM const
 #undef char
 #undef unsigned
 
-//PROGMEM const
-//#define unsigned
-//#define char uint8_t
-//#include IMAGE_03_IMAGE
-//#undef char
-//#undef unsigned
-//
-//PROGMEM const
-//#define unsigned
-//#define char uint8_t
-//#include IMAGE_04_IMAGE
-//#undef char
-//#undef unsigned
-//
-//PROGMEM const
-//#define unsigned
-//#define char uint8_t
-//#include IMAGE_05_IMAGE
-//#undef char
-//#undef unsigned
-//
 
 
 // Arduino IO layout
@@ -117,6 +89,7 @@ const int Pin_RESET = 6;
 const int Pin_BUSY = 7;
 const int Pin_EPD_CS = 8;
 
+const int Pin_BUTTON = 9;
 
 // pre-processor convert to string
 #define MAKE_STRING1(X) #X
@@ -125,6 +98,11 @@ const int Pin_EPD_CS = 8;
 
 // define the E-Ink display
 EPD_Class EPD(EPD_SIZE, Pin_PANEL_ON, Pin_BORDER, Pin_DISCHARGE, Pin_PWM, Pin_RESET, Pin_BUSY, Pin_EPD_CS, SPI);
+
+static unsigned long t = 0;
+static unsigned long elapsedTime = 0;
+static int state = 0;
+static int button_value = HIGH;
 
 // I/O setup
 void setup() {
@@ -135,6 +113,7 @@ void setup() {
   pinMode(Pin_DISCHARGE, OUTPUT);
   pinMode(Pin_BORDER, OUTPUT);
   pinMode(Pin_EPD_CS, OUTPUT);
+  pinMode(Pin_BUTTON, INPUT_PULLUP);
 
   digitalWrite(Pin_PWM, LOW);
   digitalWrite(Pin_RESET, LOW);
@@ -157,59 +136,67 @@ void setup() {
   Serial.println();
   Serial.println("Software version: " VERSION);
   Serial.println();
+
+  button_value = digitalRead(Pin_BUTTON);
+  elapsedTime = 0;
+  t = millis();
 }
-
-
-static int state = 0;
-
 
 // main loop
 void loop() {          
-  EPD.begin(); // power up the EPD panel
+  int _state = state;
 
-  switch(state) {
-  default:
-  case 0:         // clear the screen
-    EPD.clear();
-    state = 1;
-    break;
+  unsigned long _t = millis();
+  elapsedTime += (_t - t);
+  t = _t;
 
-  case 1:         // clear -> text
-    EPD.image(IMAGE_00_BITS);
-    ++state;
-    break;
-  case 2:
-    EPD.image(IMAGE_00_BITS, IMAGE_01_BITS);
-    ++state;
-    break;
-  case 3:
-    EPD.image(IMAGE_01_BITS, IMAGE_02_BITS);
-    ++state;
-    break;
-  case 4:
-    EPD.image(IMAGE_02_BITS, IMAGE_00_BITS);
-    state = 2;
-    break;
-    //  case 4:
-    //    EPD.image(IMAGE_01_BITS, IMAGE_02_BITS);
-    //    ++state;
-    //    break;
-    //  case 5:
-    //    EPD.image(IMAGE_02_BITS, IMAGE_03_BITS);
-    //    ++state;
-    //    break;
-    //  case 6:
-    //    EPD.image(IMAGE_03_BITS, IMAGE_04_BITS);
-    //    ++state;
-    //    break;
-    //  case 7:
-    //    EPD.image(IMAGE_04_BITS, IMAGE_05_BITS);
-    //    ++state;
-    //    break;
+  int _button_value = digitalRead(Pin_BUTTON);
+  if (_button_value != button_value) {
+    if (_button_value == LOW) {
+      _state = state + 1;
+      if (_state >= NUM_IMAGES+1) {
+        _state = 1;
+      }
+      elapsedTime = 0;
+    }
+    button_value = _button_value;
   }
-  EPD.end();   // power down the EPD panel
 
-  delay(5000);
+  if (elapsedTime >= LOOP_DURATION) {
+    _state = state + 1;
+    if (_state >= NUM_IMAGES+1) {
+      _state = 1;
+    }
+    elapsedTime = 0;
+  }
+
+
+  if (_state != state) {
+    state = _state;
+
+    EPD.begin(); // power up the EPD panel
+    switch(state) {
+    default:
+    case 0:         // clear the screen
+      EPD.image(IMAGE_00_BITS);
+      break;
+    case 1:         // clear -> text
+      EPD.image(IMAGE_00_BITS, IMAGE_01_BITS);
+      break;
+    case 2:
+      EPD.image(IMAGE_01_BITS, IMAGE_02_BITS);
+      break;
+    case 3:
+      EPD.image(IMAGE_02_BITS, IMAGE_00_BITS);
+      break;
+    }
+    EPD.end();   // power down the EPD panel
+    delay(100);
+  }
 }
+
+
+
+
 
 
